@@ -21,6 +21,25 @@ class ReplicateProvider(BaseProvider):
     def _resolve_model(self, model: str) -> str:
         return resolve_for_provider(model, self.name)
 
+    def _build_input(self, model: str, prompt: str, kwargs: dict) -> dict:
+        """Map our normalized request to Replicate's per-model input schema.
+
+        Verified against Replicate model docs:
+        - FLUX Kontext (black-forest-labs/flux-kontext-pro, /-max): field is `input_image` (str)
+        Other image-edit models default to `image` — Replicate's most common name. The
+        FLUX Redux input field name is unverified; if you hit an issue, pass the right
+        field name via `extra` and it will override.
+        """
+        inputs = {"prompt": prompt}
+        input_image = kwargs.pop("input_image", None)
+        if input_image:
+            if "kontext" in model:
+                inputs["input_image"] = input_image
+            else:
+                inputs["image"] = input_image
+        inputs.update(kwargs)
+        return inputs
+
     async def generate(
         self,
         prompt: str,
@@ -107,6 +126,7 @@ class ReplicateProvider(BaseProvider):
         **kwargs,
     ) -> SubmitResult:
         replicate_model = self._resolve_model(model)
+        inputs = self._build_input(replicate_model, prompt, dict(kwargs))
 
         async with httpx.AsyncClient() as client:
             try:
@@ -117,7 +137,7 @@ class ReplicateProvider(BaseProvider):
                         "Content-Type": "application/json",
                     },
                     json={
-                        "input": {"prompt": prompt, **kwargs},
+                        "input": inputs,
                         "webhook": webhook_url,
                         "webhook_events_filter": ["completed"],
                     },

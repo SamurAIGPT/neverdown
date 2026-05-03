@@ -11,7 +11,7 @@ from ..exceptions import (
     JobTimeoutError,
     ProviderUnavailableError,
 )
-from ..models import providers_for
+from ..models import is_image_edit, providers_for
 from ..providers.base import BaseProvider
 from .config import GatewayConfig
 from .models import Job
@@ -49,6 +49,22 @@ class Dispatcher:
         """Try providers in `providers_remaining` order until one accepts the job
         or all have been tried. Updates the job in the store accordingly."""
         now = _utcnow()
+
+        # Validate image-edit models have an input image. Fail fast so the user
+        # gets a clear error instead of a provider 4xx after a wasted submit.
+        if is_image_edit(job.model) and not (job.extra or {}).get("input_image"):
+            await self.jobs.mark_failed(
+                job.id,
+                error=(
+                    f"model '{job.model}' is an image-edit model and requires "
+                    "'input_image' (URL or data URI) in the request"
+                ),
+            )
+            await self._maybe_forward_webhook(job.id)
+            updated = await self.jobs.get_job(job.id)
+            assert updated is not None
+            return updated
+
         # If the model is in the registry, only try providers that actually serve it.
         # Unknown models pass through (empty set means "no opinion, let them all try").
         supported = providers_for(job.model)

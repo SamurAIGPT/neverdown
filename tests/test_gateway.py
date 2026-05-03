@@ -166,3 +166,80 @@ def test_auth_required(tmp_db_path):
             "/v1/generate", json={"prompt": "x", "model": "flux-dev"}
         )
         assert resp.status_code == 401
+
+
+def test_image_edit_model_requires_input_image(tmp_db_path):
+    """Asking for an image-edit model without input_image fails fast with a clear error
+    instead of wasting a provider submit on a malformed request."""
+    app = create_app(_make_config(tmp_db_path))
+    with TestClient(app) as client:
+        # No need to mock providers — we should never reach them
+        resp = client.post(
+            "/v1/generate",
+            headers=_auth_headers(),
+            json={"prompt": "make it look like a watercolor", "model": "flux-kontext-pro"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "failed"
+        assert "input_image" in (data["error"] or "")
+
+
+def test_image_edit_model_with_input_image_submits(tmp_db_path):
+    """When input_image is provided, the gateway forwards it to the provider as
+    the field name that provider expects (image_url for Fal Kontext)."""
+    app = create_app(_make_config(tmp_db_path))
+    with TestClient(app) as client:
+        fal_provider = app.state.providers["fal"]
+        captured = {}
+
+        async def mock_submit(prompt, model, webhook_url, **kwargs):
+            captured["prompt"] = prompt
+            captured["model"] = model
+            captured["kwargs"] = kwargs
+            return SubmitResult(provider_job_id="kontext-req-1", raw={})
+
+        fal_provider.submit_async = mock_submit
+
+        resp = client.post(
+            "/v1/generate",
+            headers=_auth_headers(),
+            json={
+                "prompt": "make it look like a watercolor",
+                "model": "flux-kontext-pro",
+                "input_image": "https://example.com/source.png",
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["status"] == "submitted"
+        assert data["provider"] == "fal"
+        # The dispatcher folded input_image into Job.extra and passed it through;
+        # the provider received it under the canonical "input_image" key.
+        assert captured["kwargs"].get("input_image") == "https://example.com/source.png"
+
+
+def test_text_to_image_model_ignores_input_image(tmp_db_path):
+    """Non-edit models that happen to receive input_image shouldn't fail — the field
+    just flows through to the provider, which will ignore it (or accept as img2img
+    seed if the model happens to support that)."""
+    app = create_app(_make_config(tmp_db_path))
+    with TestClient(app) as client:
+        fal_provider = app.state.providers["fal"]
+        fal_provider.submit_async = AsyncMock(
+            return_value=SubmitResult(provider_job_id="r1", raw={})
+        )
+
+        resp = client.post(
+            "/v1/generate",
+            headers=_auth_headers(),
+            json={
+                "prompt": "a cat in space",
+                "model": "flux-dev",
+                "input_image": "https://example.com/ignored.png",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        # Should succeed — the model isn't image-edit, so no validation fires.
+        assert data["status"] == "submitted"

@@ -196,10 +196,27 @@ See README "Configuration" section for the full env-var table. Key ones:
 - Dispatcher auto-filters failover chain to providers that actually serve the requested model
 - Unknown models pass through (devs can use raw provider slugs without registering)
 
-### v0.2.2 — Image-edit API support
-- Add optional `input_image` field to `GenerateRequest` for img2img / image-edit models
-- Wire into Nano Banana edit, FLUX Kontext, Recraft v3 edit
-- Validate at submit time: image-edit models require `input_image`
+### v0.2.2 — Image-edit API support ✅ SHIPPED
+- `input_image` field on `GenerateRequest` (URL or data URI)
+- Dispatcher validates: image-edit models (`is_image_edit(model)`) require `input_image`; fail fast with clear error otherwise
+- Per-provider `_build_input(model, prompt, kwargs)` helper maps the canonical `input_image` to the provider-specific field name:
+  - Fal Kontext: `image_url`
+  - Fal Nano Banana edit: `image_urls` (array)
+  - Replicate Kontext: `input_image`
+  - Other Replicate edit models: `image` (default; override via `extra` if model uses a different field)
+- Text-to-image models silently ignore `input_image` if passed (provider may use it as img2img seed if supported)
+
+### v0.2.3 — OpenAI provider
+- New `OpenAIProvider` (sync-to-self-callback pattern: submit, await, then POST to own /v1/callback/openai/{job_id})
+- Models: `gpt-image-1`, `gpt-image-2` (when shipped), `dall-e-3`, `dall-e-2`
+- Env: `OPENAI_API_KEY`
+- For edits: POST `/v1/images/edits` (multipart with image + mask)
+
+### v0.2.4 — Google provider
+- New `GoogleProvider` for Nano Banana via Gemini API direct (not just via Fal)
+- Imagen via AI Studio API key
+- Env: `GOOGLE_API_KEY`
+- Sync-to-self-callback pattern shared with OpenAI provider
 
 ### v0.2.3 — Replicate-compatible API
 - `POST /v1/predictions` matching Replicate's spec exactly (drop-in `replicate` SDK migration target)

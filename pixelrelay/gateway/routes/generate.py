@@ -30,10 +30,18 @@ def make_router(auth_dep) -> APIRouter:
                 detail="No configured providers in request — set FAL_KEY / REPLICATE_API_TOKEN",
             )
 
+        # Fold input_image into extra so it flows through to the provider adapter
+        # via Job.extra → submit_async(**kwargs). Provider adapters know to look
+        # for the canonical "input_image" key and map it to the provider-specific
+        # field name (image_url on Fal, input_image on Replicate Kontext, etc.).
+        extra = dict(req.extra or {})
+        if req.input_image:
+            extra["input_image"] = req.input_image
+
         job = await jobs.create_job(
             model=req.model,
             prompt=req.prompt,
-            extra=req.extra or {},
+            extra=extra,
             webhook_url=req.webhook_url,
             providers=providers,
         )

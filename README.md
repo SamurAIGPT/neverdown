@@ -185,6 +185,18 @@ Submit a generation job. Asynchronous by default.
 }
 ```
 
+For **image-edit models** (Kontext, Nano Banana edit, FLUX Redux), pass an `input_image`:
+
+```json
+{
+  "prompt": "make this look like a watercolor",
+  "model": "flux-kontext-pro",
+  "input_image": "https://example.com/source.png"
+}
+```
+
+The gateway maps `input_image` to each provider's expected field name (`image_url` on Fal, `input_image` on Replicate Kontext, `image_urls` array on Fal Nano Banana edit). Asking for an image-edit model without `input_image` fails fast with a clear error.
+
 Add `?wait=true` for a synchronous response (blocks until terminal or `PIXELRELAY_JOB_DEADLINE`).
 
 Response:
@@ -301,10 +313,12 @@ When you request a single-provider model with `providers=["fal", "replicate"]`, 
 
 ## Roadmap
 
-- **v0.2.2** — Image-edit API support (`input_image` field for Kontext / Nano Banana edit / Recraft)
-- **v0.2.3** — Replicate-compatible API (`POST /v1/predictions`) for drop-in migration from Replicate-only setups
+- **v0.2.2** — Image-edit API support (`input_image` field for Kontext / Nano Banana edit / FLUX Redux) ✅ shipped
+- **v0.2.3** — OpenAI provider (gpt-image-1, gpt-image-2, dall-e-3) via sync-to-self-callback adapter
+- **v0.2.4** — Google provider (Nano Banana via Gemini API, Imagen via AI Studio)
+- **v0.2.5** — Replicate-compatible API (`POST /v1/predictions`) for drop-in migration from Replicate-only setups
 - **v0.3.0** — Dashboard UI, structured logs, Alembic migrations, more providers (RunPod, Together, Stability)
-- **v0.4.0** — Strategy modes (cheapest/fastest), per-provider cooldown config, health-check pre-flight
+- **v0.4.0** — Strategy modes (cheapest/fastest), per-provider cooldown config, health-check pre-flight, multi-key load balancing
 - **v0.6.0** — Video generation (Runway, Kling, Pika)
 
 Full roadmap with rationale: [CONTEXT.md](CONTEXT.md#roadmap)

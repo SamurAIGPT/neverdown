@@ -12,6 +12,9 @@ class GenerateRequest(BaseModel):
     model: str = "flux-dev"
     providers: Optional[List[str]] = None
     webhook_url: Optional[str] = None
+    # Reference image URL or data URI. Required for image-edit models
+    # (Kontext, Nano Banana edit, FLUX Redux). Ignored by text-to-image models.
+    input_image: Optional[str] = None
     extra: Dict[str, Any] = Field(default_factory=dict)
 
 

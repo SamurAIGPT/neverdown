@@ -21,6 +21,25 @@ class FalProvider(BaseProvider):
     def _resolve_model(self, model: str) -> str:
         return resolve_for_provider(model, self.name)
 
+    def _build_input(self, model: str, prompt: str, kwargs: dict) -> dict:
+        """Map our normalized request to fal's per-model input schema.
+
+        Verified against fal model docs:
+        - FLUX Kontext (fal-ai/flux-pro/kontext, .../kontext/max): field is `image_url` (str)
+        - Nano Banana edit (fal-ai/nano-banana/edit, /-2/edit, /-pro/edit): field is `image_urls` (list)
+        Other image-edit models default to `image_url`.
+        """
+        body = {"prompt": prompt}
+        input_image = kwargs.pop("input_image", None)
+        if input_image:
+            if "nano-banana" in model and "edit" in model:
+                body["image_urls"] = [input_image]
+            else:
+                # FLUX Kontext, FLUX Redux, generic edit
+                body["image_url"] = input_image
+        body.update(kwargs)
+        return body
+
     async def generate(
         self,
         prompt: str,
@@ -113,6 +132,7 @@ class FalProvider(BaseProvider):
         **kwargs,
     ) -> SubmitResult:
         fal_model = self._resolve_model(model)
+        body = self._build_input(fal_model, prompt, dict(kwargs))
 
         async with httpx.AsyncClient() as client:
             try:
@@ -123,7 +143,7 @@ class FalProvider(BaseProvider):
                         "Authorization": f"Key {self.api_key}",
                         "Content-Type": "application/json",
                     },
-                    json={"prompt": prompt, **kwargs},
+                    json=body,
                     timeout=30.0,
                 )
             except (httpx.ConnectError, httpx.TimeoutException) as e:
@@ -138,11 +158,11 @@ class FalProvider(BaseProvider):
                 resp.text, provider=self.name, status_code=resp.status_code
             )
 
-        body = resp.json()
-        request_id = body.get("request_id")
+        rbody = resp.json()
+        request_id = rbody.get("request_id")
         if not request_id:
             raise JobFailedError("fal response missing request_id", provider=self.name)
-        return SubmitResult(provider_job_id=request_id, raw=body)
+        return SubmitResult(provider_job_id=request_id, raw=rbody)
 
     @staticmethod
     def parse_callback(headers: Dict[str, str], body: bytes) -> CallbackPayload:
