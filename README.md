@@ -100,15 +100,14 @@ The gateway fixes all three: persistent DB-backed state, webhook callbacks inste
 
 ## Compared to alternatives
 
-| | Pixelrelay | Portkey / LiteLLM | Provider SDKs (replicate, fal-client, …) |
+| | Pixelrelay | Provider SDKs (`replicate`, `fal-client`, etc.) | DIY (your own failover loop) |
 |---|:---:|:---:|:---:|
-| Open source | ✅ Apache 2.0 | ✅ MIT / Apache | ✅ |
-| Self-hosted | ✅ | ✅ | n/a |
-| BYO keys (direct to provider) | ✅ | ✅ | ✅ |
-| Media-native (image + video) | ✅ | ❌ LLM-first | single provider |
-| Webhook-native (no polling) | ✅ | ❌ sync | mixed |
-| Persistent jobs (DB-backed) | ✅ | ❌ in-process | ❌ |
-| Multi-provider failover | ✅ | ✅ (LLMs) | ❌ |
+| Multi-provider in one API | ✅ | ❌ one per SDK | ✅ if you write it |
+| Webhook-native (no client-side polling) | ✅ | mixed (depends on provider) | up to you |
+| Persistent jobs (survive restarts, share across replicas) | ✅ DB-backed | ❌ | ❌ unless you build it |
+| Automatic failover with cooldown | ✅ | ❌ | ✅ if you write it |
+| BYO provider keys (no billing layer) | ✅ | ✅ | ✅ |
+| Self-hosted, open source (Apache 2.0) | ✅ | n/a | n/a |
 
 **Use Pixelrelay if** you want a media-gen gateway you fully own, with webhooks, persistence, and failover across providers — without writing the orchestration yourself.
 
