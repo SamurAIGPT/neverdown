@@ -1,11 +1,13 @@
 import asyncio
+import json
 import time
+from typing import Dict
+
 import httpx
 
-from .base import BaseProvider, GenerationResult
-from ..exceptions import ProviderUnavailableError, JobFailedError, JobTimeoutError
+from .base import BaseProvider, CallbackPayload, GenerationResult, SubmitResult
+from ..exceptions import JobFailedError, JobTimeoutError, ProviderUnavailableError
 
-# Replicate model version map
 REPLICATE_MODEL_MAP = {
     "flux-dev": "black-forest-labs/flux-dev",
     "flux-schnell": "black-forest-labs/flux-schnell",
@@ -21,6 +23,9 @@ class ReplicateProvider(BaseProvider):
     def __init__(self, api_key: str):
         self.api_key = api_key
 
+    def _resolve_model(self, model: str) -> str:
+        return REPLICATE_MODEL_MAP.get(model, model)
+
     async def generate(
         self,
         prompt: str,
@@ -28,11 +33,10 @@ class ReplicateProvider(BaseProvider):
         timeout: float = 120.0,
         **kwargs,
     ) -> GenerationResult:
-        replicate_model = REPLICATE_MODEL_MAP.get(model, model)
+        replicate_model = self._resolve_model(model)
         start = time.monotonic()
 
         async with httpx.AsyncClient() as client:
-            # Submit job
             try:
                 submit_resp = await client.post(
                     f"https://api.replicate.com/v1/models/{replicate_model}/predictions",
@@ -51,7 +55,9 @@ class ReplicateProvider(BaseProvider):
 
             if submit_resp.status_code >= 500:
                 raise ProviderUnavailableError(
-                    f"HTTP {submit_resp.status_code}", provider=self.name, status_code=submit_resp.status_code
+                    f"HTTP {submit_resp.status_code}",
+                    provider=self.name,
+                    status_code=submit_resp.status_code,
                 )
             if submit_resp.status_code >= 400:
                 raise JobFailedError(
@@ -61,13 +67,9 @@ class ReplicateProvider(BaseProvider):
             job = submit_resp.json()
             prediction_url = job["urls"]["get"]
 
-            # Poll for completion
             while True:
-                elapsed = time.monotonic() - start
-                if elapsed >= timeout:
-                    raise JobTimeoutError(
-                        f"Exceeded {timeout}s timeout", provider=self.name
-                    )
+                if time.monotonic() - start >= timeout:
+                    raise JobTimeoutError(f"Exceeded {timeout}s timeout", provider=self.name)
 
                 await asyncio.sleep(POLL_INTERVAL)
 
@@ -78,7 +80,7 @@ class ReplicateProvider(BaseProvider):
                         timeout=10.0,
                     )
                 except httpx.TimeoutException:
-                    continue  # transient, keep polling
+                    continue
 
                 if poll_resp.status_code >= 500:
                     raise ProviderUnavailableError(
@@ -97,10 +99,70 @@ class ReplicateProvider(BaseProvider):
                         model=model,
                         latency_ms=(time.monotonic() - start) * 1000,
                     )
-
                 elif status == "failed":
                     raise JobFailedError(
                         data.get("error", "Job failed"), provider=self.name
                     )
 
-                # starting or processing — keep polling
+    async def submit_async(
+        self,
+        prompt: str,
+        model: str,
+        webhook_url: str,
+        **kwargs,
+    ) -> SubmitResult:
+        replicate_model = self._resolve_model(model)
+
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.post(
+                    f"https://api.replicate.com/v1/models/{replicate_model}/predictions",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "input": {"prompt": prompt, **kwargs},
+                        "webhook": webhook_url,
+                        "webhook_events_filter": ["completed"],
+                    },
+                    timeout=30.0,
+                )
+            except (httpx.ConnectError, httpx.TimeoutException) as e:
+                raise ProviderUnavailableError(str(e), provider=self.name)
+
+        if resp.status_code >= 500:
+            raise ProviderUnavailableError(
+                f"HTTP {resp.status_code}", provider=self.name, status_code=resp.status_code
+            )
+        if resp.status_code >= 400:
+            raise JobFailedError(
+                resp.text, provider=self.name, status_code=resp.status_code
+            )
+
+        body = resp.json()
+        prediction_id = body.get("id")
+        if not prediction_id:
+            raise JobFailedError("replicate response missing id", provider=self.name)
+        return SubmitResult(provider_job_id=prediction_id, raw=body)
+
+    @staticmethod
+    def parse_callback(headers: Dict[str, str], body: bytes) -> CallbackPayload:
+        data = json.loads(body)
+        prediction_id = data.get("id")
+        status = data.get("status")
+        if status == "succeeded":
+            output = data.get("output") or []
+            image_url = output[0] if isinstance(output, list) and output else (output if isinstance(output, str) else None)
+            return CallbackPayload(
+                provider_job_id=prediction_id,
+                status="succeeded",
+                image_url=image_url,
+                raw=data,
+            )
+        return CallbackPayload(
+            provider_job_id=prediction_id,
+            status="failed",
+            error=str(data.get("error") or f"replicate status: {status}"),
+            raw=data,
+        )

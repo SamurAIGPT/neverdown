@@ -1,0 +1,49 @@
+services:
+  pixelrelay:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: pixelrelay:latest
+    ports:
+      - "8000:8000"
+    environment:
+      # ── Required ─────────────────────────────────────────────
+      PIXELRELAY_GATEWAY_KEY: ${PIXELRELAY_GATEWAY_KEY:?run \`openssl rand -hex 32\` and put it in .env}
+      PIXELRELAY_PUBLIC_URL: ${PIXELRELAY_PUBLIC_URL:?must be reachable from fal/replicate, e.g. https://gateway.example.com}
+      # ── Provider keys (BYOK) ─────────────────────────────────
+      FAL_KEY: ${FAL_KEY:-}
+      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
+      # ── Webhook signature config (optional but recommended) ──
+      FAL_WEBHOOK_PUBLIC_KEY: ${FAL_WEBHOOK_PUBLIC_KEY:-}
+      REPLICATE_WEBHOOK_SECRET: ${REPLICATE_WEBHOOK_SECRET:-}
+      PIXELRELAY_WEBHOOK_SECRET: ${PIXELRELAY_WEBHOOK_SECRET:-change-me}
+      # ── Storage ──────────────────────────────────────────────
+      # SQLite by default. Uncomment the postgres service below and switch to:
+      # DATABASE_URL: postgresql+asyncpg://pixelrelay:pixelrelay@postgres:5432/pixelrelay
+      DATABASE_URL: sqlite+aiosqlite:////data/pixelrelay.db
+    volumes:
+      - pixelrelay_data:/data
+    restart: unless-stopped
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+
+  # Uncomment for production deployments. SQLite is fine for single-container,
+  # but anything horizontally scaled needs Postgres.
+  # postgres:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_USER: pixelrelay
+  #     POSTGRES_PASSWORD: pixelrelay
+  #     POSTGRES_DB: pixelrelay
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U pixelrelay"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  pixelrelay_data:
+  # postgres_data:
