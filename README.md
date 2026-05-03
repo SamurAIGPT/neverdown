@@ -100,17 +100,17 @@ The gateway fixes all three: persistent DB-backed state, webhook callbacks inste
 
 ## Compared to alternatives
 
-| | Pixelrelay | Lumenfall | Portkey / LiteLLM | Provider SDKs (replicate, fal-client, …) |
-|---|:---:|:---:|:---:|:---:|
-| Open source | ✅ Apache 2.0 | ❌ Closed | ✅ MIT / Apache | ✅ |
-| Self-hosted | ✅ | ❌ Hosted only | ✅ | n/a |
-| BYO keys (no billing layer) | ✅ direct to provider | ❌ they bill, no markup | ✅ | ✅ |
-| Media-native (image + video) | ✅ | ✅ | ❌ LLM-first | single provider |
-| Webhook-native (no polling) | ✅ | ❌ sync polling | ❌ sync | mixed |
-| Persistent jobs (DB-backed) | ✅ | ✅ | ❌ in-process | ❌ |
-| Multi-provider failover | ✅ | ✅ | ✅ (LLMs) | ❌ |
+| | Pixelrelay | Portkey / LiteLLM | Provider SDKs (replicate, fal-client, …) |
+|---|:---:|:---:|:---:|
+| Open source | ✅ Apache 2.0 | ✅ MIT / Apache | ✅ |
+| Self-hosted | ✅ | ✅ | n/a |
+| BYO keys (direct to provider) | ✅ | ✅ | ✅ |
+| Media-native (image + video) | ✅ | ❌ LLM-first | single provider |
+| Webhook-native (no polling) | ✅ | ❌ sync | mixed |
+| Persistent jobs (DB-backed) | ✅ | ❌ in-process | ❌ |
+| Multi-provider failover | ✅ | ✅ (LLMs) | ❌ |
 
-**Use Pixelrelay if** you want a media-gen gateway you fully own, with webhooks, persistence, and failover across providers — without sending your jobs through someone else's billing layer.
+**Use Pixelrelay if** you want a media-gen gateway you fully own, with webhooks, persistence, and failover across providers — without writing the orchestration yourself.
 
 ---
 
