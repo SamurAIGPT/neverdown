@@ -25,8 +25,17 @@ def test_providers_for_known_multiprovider_model():
 
 def test_providers_for_fal_only_model():
     assert models.providers_for("nano-banana") == {"fal"}
+    assert models.providers_for("nano-banana-2") == {"fal"}
+    assert models.providers_for("nano-banana-pro") == {"fal"}
     assert models.providers_for("luma-photon") == {"fal"}
-    assert models.providers_for("bria-2.3") == {"fal"}
+    assert models.providers_for("bria") == {"fal"}
+
+
+def test_providers_for_replicate_only_model():
+    """Some models are Replicate-only (FLUX Redux, Recraft v4 SVG, Ideogram v3 modes)."""
+    assert models.providers_for("flux-redux-dev") == {"replicate"}
+    assert models.providers_for("recraft-v4-svg") == {"replicate"}
+    assert models.providers_for("ideogram-v3-quality") == {"replicate"}
 
 
 def test_providers_for_unknown_returns_empty():
@@ -50,16 +59,34 @@ def test_image_edit_models_are_flagged():
     assert models.is_image_edit("flux-kontext-pro") is True
     assert models.is_image_edit("flux-kontext-max") is True
     assert models.is_image_edit("nano-banana-edit") is True
+    assert models.is_image_edit("nano-banana-2-edit") is True
+    assert models.is_image_edit("nano-banana-pro-edit") is True
+    assert models.is_image_edit("flux-redux-dev") is True
     # Standard text-to-image models should not be flagged
     assert models.is_image_edit("flux-dev") is False
     assert models.is_image_edit("sdxl") is False
+    assert models.is_image_edit("nano-banana") is False  # base, not edit variant
 
 
 def test_registry_size_is_meaningful():
     """Sanity check that we shipped a real catalog, not just a stub."""
-    assert len(models.REGISTRY) >= 25, (
-        f"Registry has only {len(models.REGISTRY)} models — expected at least 25"
+    assert len(models.REGISTRY) >= 30, (
+        f"Registry has only {len(models.REGISTRY)} models — expected at least 30"
     )
+
+
+def test_all_slugs_use_correct_provider_path_format():
+    """Fal slugs always start with 'fal-ai/'. Replicate slugs are 'owner/name' (no slash variation)."""
+    for canonical, info in models.REGISTRY.items():
+        if "fal" in info.slugs:
+            assert info.slugs["fal"].startswith("fal-ai/"), (
+                f"Fal slug for {canonical} is malformed: {info.slugs['fal']}"
+            )
+        if "replicate" in info.slugs:
+            slug = info.slugs["replicate"]
+            assert "/" in slug and not slug.startswith("/"), (
+                f"Replicate slug for {canonical} is malformed: {slug}"
+            )
 
 
 def test_every_registry_entry_has_at_least_one_slug():

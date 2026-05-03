@@ -248,21 +248,22 @@ Library mode runs a polling loop in your own process — see the "Why a gateway"
 
 ## Supported models
 
-The catalog is a curated registry — every entry is mapped to provider slugs so the gateway knows which providers can serve it. Unknown model names pass through verbatim, so you can hit a private Fal deployment with the raw slug (e.g. `fal-ai/your-org/your-model`) without registering it first.
+Every slug in the registry is **verified against the provider's live model page** (fal.ai / replicate.com). Unknown canonical names pass through verbatim — devs can hit a private Fal deployment with `fal-ai/your-org/your-model` directly, no registration required.
 
 | Family | Canonical names | Providers |
 |---|---|---|
-| **FLUX (Black Forest Labs)** | `flux-dev`, `flux-schnell`, `flux-pro`, `flux-1.1-pro`, `flux-1.1-pro-ultra`, `flux-realism`, `flux-redux` | Fal + Replicate (most) |
-| **FLUX Kontext** (img2img edit) | `flux-kontext-pro`, `flux-kontext-max` | Fal + Replicate |
+| **FLUX (Black Forest Labs)** | `flux-dev`, `flux-schnell`, `flux-pro`, `flux-1.1-pro`, `flux-1.1-pro-ultra`, `flux-realism` | Fal + Replicate (`flux-realism` Fal-only) |
+| **FLUX Redux** (img2img variations) | `flux-redux-dev`, `flux-redux-schnell` | Replicate-only |
+| **FLUX Kontext** (text-driven edits) | `flux-kontext-pro`, `flux-kontext-max` | Fal + Replicate |
 | **Stable Diffusion** | `sd3`, `sd3.5-large`, `sd3.5-large-turbo`, `sd3.5-medium`, `sdxl` | Fal + Replicate |
-| **Ideogram** (great at text in images) | `ideogram-v2`, `ideogram-v2-turbo`, `ideogram-v3`, `ideogram-v3-quality`, `ideogram-v3-turbo` | Fal + Replicate |
-| **Recraft** (logos / SVG) | `recraft-v3`, `recraft-v3-svg` | Fal + Replicate |
-| **Imagen (Google)** | `imagen-3`, `imagen-3-fast`, `imagen-4` | Fal + Replicate |
-| **Nano Banana (Google)** | `nano-banana`, `nano-banana-pro`, `nano-banana-edit` | Fal-only |
+| **Ideogram** (text in images) | `ideogram-v2`, `ideogram-v2-turbo`, `ideogram-v3` (Fal+Replicate); `ideogram-v3-quality`, `ideogram-v3-turbo` (Replicate-only — Fal v3 modes are parameters) | mixed |
+| **Recraft** (logos / SVG) | `recraft-v3`, `recraft-v3-svg`, `recraft-v4`, `recraft-v4-pro`, `recraft-v4-svg` | mixed (SVG variants Replicate-only) |
+| **Imagen (Google)** | `imagen-3`, `imagen-3-fast`, `imagen-4` (Fal+Replicate); `imagen-4-fast`, `imagen-4-ultra` (Fal-only) | mixed |
+| **Nano Banana (Google)** | `nano-banana`, `nano-banana-edit`, `nano-banana-2`, `nano-banana-2-edit`, `nano-banana-pro`, `nano-banana-pro-edit` | Fal-only |
 | **Luma Photon** | `luma-photon`, `luma-photon-flash` | Fal-only |
-| **Bria** (commercial-safe) | `bria-2.3` | Fal-only |
+| **Bria** (commercial-safe) | `bria` | Fal-only |
 
-When you ask for a Fal-only model with `providers=["fal", "replicate"]`, the gateway automatically drops `replicate` from the failover chain and logs the reason in the job's `attempts`. To add a model to the registry, edit [`pixelrelay/models.py`](pixelrelay/models.py) — one row per model.
+When you request a single-provider model with `providers=["fal", "replicate"]`, the gateway automatically drops the unsupported provider from the failover chain and logs the reason in the job's `attempts`. To add a model, edit [`pixelrelay/models.py`](pixelrelay/models.py) — one row per model. **Always verify the slug against the provider's live model page before merging.**
 
 ---
 
