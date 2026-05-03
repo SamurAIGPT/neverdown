@@ -322,15 +322,25 @@ When you request a single-provider model with `providers=["fal", "replicate"]`, 
 
 ## Roadmap
 
-- **v0.2.2** — Image-edit API support (`input_image` field for Kontext / Nano Banana edit / FLUX Redux) ✅ shipped
-- **v0.2.3** — OpenAI provider (gpt-image-1, dall-e-3, dall-e-2) via sync-to-self-callback adapter ✅ shipped
-- **v0.2.4** — Google provider (Nano Banana via Gemini API direct, Imagen 4 via AI Studio) ✅ shipped
-- **v0.2.5** — Replicate-compatible API (`POST /v1/predictions`) for drop-in migration from Replicate-only setups
-- **v0.3.0** — Dashboard UI, structured logs, Alembic migrations, more providers (RunPod, Together, Stability)
-- **v0.4.0** — Strategy modes (cheapest/fastest), per-provider cooldown config, health-check pre-flight, multi-key load balancing
-- **v0.6.0** — Video generation (Runway, Kling, Pika)
+**Shipped**
+- **v0.2.2** — Image-edit API support (`input_image` field for Kontext / Nano Banana edit / FLUX Redux)
+- **v0.2.3** — OpenAI provider (gpt-image-1, dall-e-3, dall-e-2) via sync-to-self-callback adapter
+- **v0.2.4** — Google provider (Nano Banana via Gemini API direct, Imagen 4 via AI Studio)
 
-Full roadmap with rationale: [CONTEXT.md](CONTEXT.md#roadmap)
+**Next**
+- Multi-key load balancing per provider (`FAL_KEYS=k1,k2,k3` round-robin) to side-step single-account rate limits
+- Simple result cache by `(prompt, model, extras)` hash + TTL — saves repeated dev-loop generations
+- Stats endpoint (`GET /v1/stats`) — success rate, p50/p95 latency, jobs/min per provider
+- Web dashboard at `/dashboard` — live jobs, attempts timeline, provider cooldowns, latency
+
+**Later**
+- More providers — RunPod, Together, Stability AI direct
+- Video generation — Runway, Kling, Pika; new `/v1/videos/generations` endpoint
+- Reliability knobs — per-provider cooldown config, health-check pre-flight, configurable retry strategy
+- Storage-backed image URLs (replace data URIs returned by Google with hosted URLs)
+- Alembic migrations for production Postgres deploys
+
+Discussion of priorities and rationale: [CONTEXT.md](CONTEXT.md#roadmap)
 
 ---
 

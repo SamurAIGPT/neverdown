@@ -232,6 +232,23 @@ See README "Configuration" section for the full env-var table. Key ones:
 - Imagen 3 has been shut down per Google's docs; we kept the `imagen-3`/`imagen-3-fast` registry entries pointing to Fal/Replicate which may still proxy.
 - Env: `GOOGLE_API_KEY` (AI Studio); auth via `x-goog-api-key` header. validate() now accepts any of FAL/REPLICATE/OPENAI/GOOGLE.
 
+### Cut from the roadmap: Replicate-compatible API
+Earlier I had v0.2.5 as a `POST /v1/predictions` endpoint matching Replicate's spec for drop-in migration. Reconsidering, this got cut. Reasons:
+1. There is no "OpenAI of media" — Replicate's SDK is popular but not universal (Fal has its own, many devs hit HTTP directly). The "zero-line migration" wedge that works for Portkey vs OpenAI doesn't apply here.
+2. Replicate users who'd switch already need to write new code to use our failover/multi-provider logic — API compat doesn't actually save them work.
+3. Replicate's prediction-object shape, version-pinning, polling semantics, and model-specific endpoints would all need to be matched accurately. 2–3 days of careful work, not half a day.
+4. Tracking Replicate's API evolution is a perpetual maintenance burden.
+5. Leading with "we're Replicate-compatible" frames us as a clone instead of a media gateway with our own clean API. Bad for positioning after the v0.2.x README rewrite.
+6. Our `/v1/generate` is actually nicer than Replicate's shape (declarative provider list, optional webhook URL, attempts metadata, model-aware routing). Hiding it behind a worse interface costs us.
+
+If a major Replicate-only customer surfaces later with a concrete migration ask, we can revisit. Until then, the slot reclaims for higher-leverage work.
+
+### Next priorities (from Portkey-feature audit)
+- **Multi-key load balancing per provider** — `FAL_KEYS=k1,k2,k3` round-robin pool. Solves the #1 production pain (single-account rate limits). Standalone, no surface-area expansion. ~1 day.
+- **Simple result cache** — hash of `(prompt, model, extras)` → cached `image_url` for TTL. Optional via `cache_ttl` on the request. Massive dev-loop win. ~1 day.
+- **Stats endpoint** — `GET /v1/stats?since=1h` returning per-provider success rate, p50/p95 latency, jobs/min. Foundation for the dashboard. ~half a day.
+- **Web dashboard** — static SPA at `/dashboard` showing live jobs, attempts timeline, provider cooldown status, latency graph. Visible product = adopted product. ~2–3 days.
+
 ### v0.2.3 — Replicate-compatible API
 - `POST /v1/predictions` matching Replicate's spec exactly (drop-in `replicate` SDK migration target)
 - `GET /v1/predictions/{id}` mirroring Replicate's prediction object shape
