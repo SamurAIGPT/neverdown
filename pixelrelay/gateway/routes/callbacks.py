@@ -23,6 +23,16 @@ async def replicate_callback(job_id: str, request: Request) -> dict:
     return await _handle_callback(request, job_id, provider_name="replicate")
 
 
+@router.post("/v1/callback/openai/{job_id}")
+async def openai_callback(job_id: str, request: Request) -> dict:
+    """OpenAI is a sync API with no webhooks. The gateway's own background task
+    POSTs here after calling OpenAI; we trust the loopback. Anyone who wanted
+    to spoof a callback would need to guess an active UUID job_id, which is
+    impractical. For multi-tenant deployments, restrict callback paths via a
+    reverse proxy."""
+    return await _handle_callback(request, job_id, provider_name="openai")
+
+
 async def _handle_callback(request: Request, job_id: str, *, provider_name: str) -> dict:
     config = request.app.state.config
     dispatcher = request.app.state.dispatcher
@@ -37,6 +47,11 @@ async def _handle_callback(request: Request, job_id: str, *, provider_name: str)
     elif provider_name == "replicate":
         if not verify_replicate(headers, body, config.replicate_webhook_secret):
             raise HTTPException(status_code=401, detail="invalid replicate signature")
+    elif provider_name == "openai":
+        # Self-callback from the gateway's own background task. The unguessable
+        # UUID job_id in the path is the auth boundary; no external signature
+        # to verify since OpenAI doesn't sign anything.
+        pass
 
     provider = providers.get(provider_name)
     if provider is None:

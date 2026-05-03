@@ -158,7 +158,8 @@ python -m pixelrelay.gateway
 | `DATABASE_URL` | `sqlite+aiosqlite:///./pixelrelay.db` | `postgresql+asyncpg://...` for production |
 | `FAL_KEY` | — | Provider key (BYOK) |
 | `REPLICATE_API_TOKEN` | — | Provider key (BYOK) |
-| `PIXELRELAY_PROVIDERS` | `fal,replicate` | Default provider order |
+| `OPENAI_API_KEY` | — | Provider key (BYOK). At least one of FAL/REPLICATE/OPENAI is required. |
+| `PIXELRELAY_PROVIDERS` | `fal,replicate` | Default provider order. Add `openai` here if you want gpt-image-1 in the default chain. |
 | `FAL_WEBHOOK_PUBLIC_KEY` | (unset) | Hex-encoded ed25519 public key. If unset, signature verification is skipped (warning logged). |
 | `REPLICATE_WEBHOOK_SECRET` | (unset) | `whsec_...`, fetched from `GET /v1/webhooks/default/secret` |
 | `PIXELRELAY_WEBHOOK_SECRET` | `change-me-in-production` | HMAC secret for signing webhooks the gateway sends to your app |
@@ -287,8 +288,11 @@ asyncio.run(main())
 |---|---|---|
 | [Fal.ai](https://fal.ai) | Native (ed25519-signed) | `FAL_KEY` |
 | [Replicate](https://replicate.com) | Native (HMAC-SHA256-signed) | `REPLICATE_API_TOKEN` |
+| [OpenAI](https://platform.openai.com) | Sync API → submit-then-self-callback | `OPENAI_API_KEY` |
 
-More on the roadmap: RunPod, Stability AI, Together, OpenAI, Google, Runway, Kling, Pika.
+More on the roadmap: Google (Gemini / Imagen), RunPod, Stability AI, Together, Runway, Kling, Pika.
+
+> **OpenAI is sync.** OpenAI's image API doesn't expose webhooks. The provider runs a background task that calls OpenAI synchronously (5–30s wait), then POSTs the result to the gateway's own callback URL. To you, the API looks identical — `submitted` → webhook delivered. If the gateway restarts mid-call, the failover worker catches the orphaned job and resubmits to the next provider in your list.
 
 ## Supported models
 
@@ -306,6 +310,7 @@ Every slug in the registry is **verified against the provider's live model page*
 | **Nano Banana (Google)** | `nano-banana`, `nano-banana-edit`, `nano-banana-2`, `nano-banana-2-edit`, `nano-banana-pro`, `nano-banana-pro-edit` | Fal-only |
 | **Luma Photon** | `luma-photon`, `luma-photon-flash` | Fal-only |
 | **Bria** (commercial-safe) | `bria` | Fal-only |
+| **OpenAI** | `gpt-image-1`, `dall-e-3`, `dall-e-2` | OpenAI-only |
 
 When you request a single-provider model with `providers=["fal", "replicate"]`, the gateway automatically drops the unsupported provider from the failover chain and logs the reason in the job's `attempts`.
 
@@ -314,7 +319,7 @@ When you request a single-provider model with `providers=["fal", "replicate"]`, 
 ## Roadmap
 
 - **v0.2.2** — Image-edit API support (`input_image` field for Kontext / Nano Banana edit / FLUX Redux) ✅ shipped
-- **v0.2.3** — OpenAI provider (gpt-image-1, gpt-image-2, dall-e-3) via sync-to-self-callback adapter
+- **v0.2.3** — OpenAI provider (gpt-image-1, dall-e-3, dall-e-2) via sync-to-self-callback adapter ✅ shipped
 - **v0.2.4** — Google provider (Nano Banana via Gemini API, Imagen via AI Studio)
 - **v0.2.5** — Replicate-compatible API (`POST /v1/predictions`) for drop-in migration from Replicate-only setups
 - **v0.3.0** — Dashboard UI, structured logs, Alembic migrations, more providers (RunPod, Together, Stability)

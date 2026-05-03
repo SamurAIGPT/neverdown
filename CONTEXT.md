@@ -206,11 +206,14 @@ See README "Configuration" section for the full env-var table. Key ones:
   - Other Replicate edit models: `image` (default; override via `extra` if model uses a different field)
 - Text-to-image models silently ignore `input_image` if passed (provider may use it as img2img seed if supported)
 
-### v0.2.3 — OpenAI provider
-- New `OpenAIProvider` (sync-to-self-callback pattern: submit, await, then POST to own /v1/callback/openai/{job_id})
-- Models: `gpt-image-1`, `gpt-image-2` (when shipped), `dall-e-3`, `dall-e-2`
-- Env: `OPENAI_API_KEY`
-- For edits: POST `/v1/images/edits` (multipart with image + mask)
+### v0.2.3 — OpenAI provider ✅ SHIPPED
+- New `OpenAIProvider` in `pixelrelay/providers/openai.py`
+- Sync-to-self-callback pattern: `submit_async` returns immediately with a synthesized `openai-{uuid}` provider_job_id and spawns an `asyncio.create_task` background coroutine. The task POSTs to OpenAI synchronously (5–30s), then POSTs the result to the gateway's own `/v1/callback/openai/{job_id}` URL. From there the flow is identical to fal/replicate.
+- Models: `gpt-image-1`, `dall-e-3`, `dall-e-2` (gpt-image-2 deferred until OpenAI ships it; pass-through still works for raw slugs)
+- Env: `OPENAI_API_KEY` — added to GatewayConfig + validate() + _build_provider_registry
+- Callback route: `POST /v1/callback/openai/{job_id}` — no signature verification (loopback trust + unguessable UUID auth boundary)
+- Restart trade-off: in-flight asyncio task is lost on gateway restart; deadline worker catches orphan via failover. One wasted OpenAI request, no lost job. Proper task queue is a v1.0 concern.
+- Image edit support (`/v1/images/edits` multipart) deferred to v0.2.4+; gpt-image-1 ships text-to-image only.
 
 ### v0.2.4 — Google provider
 - New `GoogleProvider` for Nano Banana via Gemini API direct (not just via Fal)

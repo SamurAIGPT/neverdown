@@ -36,7 +36,7 @@ def tmp_db_path():
         yield Path(d) / "test.db"
 
 
-def _make_config(db_path: Path) -> GatewayConfig:
+def _make_config(db_path: Path, *, with_openai: bool = False) -> GatewayConfig:
     return GatewayConfig(
         gateway_api_key="test-key",
         auth_disabled=False,
@@ -44,6 +44,7 @@ def _make_config(db_path: Path) -> GatewayConfig:
         public_url="http://test-gateway",
         fal_key="fake-fal-key",
         replicate_token="fake-replicate-token",
+        openai_key="fake-openai-key" if with_openai else None,
         default_providers=["fal", "replicate"],
         fal_webhook_public_key=None,  # disable verification in tests
         replicate_webhook_secret=None,
@@ -217,6 +218,58 @@ def test_image_edit_model_with_input_image_submits(tmp_db_path):
         # The dispatcher folded input_image into Job.extra and passed it through;
         # the provider received it under the canonical "input_image" key.
         assert captured["kwargs"].get("input_image") == "https://example.com/source.png"
+
+
+def test_openai_provider_registered_when_key_set(tmp_db_path):
+    """OpenAI shows up in the provider registry when OPENAI_API_KEY is configured."""
+    app = create_app(_make_config(tmp_db_path, with_openai=True))
+    with TestClient(app) as client:
+        assert "openai" in app.state.providers
+        # Health should still work
+        assert client.get("/health").status_code == 200
+
+
+def test_openai_self_callback_completes_job(tmp_db_path):
+    """End-to-end: OpenAI provider submits, simulates the self-callback, job
+    becomes succeeded. We mock submit_async to skip the real OpenAI call but
+    still drive the rest of the flow through the actual /v1/callback/openai/
+    route, which is the codepath the background task hits in production."""
+    app = create_app(_make_config(tmp_db_path, with_openai=True))
+    with TestClient(app) as client:
+        openai_provider = app.state.providers["openai"]
+        openai_provider.submit_async = AsyncMock(
+            return_value=SubmitResult(provider_job_id="openai-abc123", raw={})
+        )
+
+        resp = client.post(
+            "/v1/generate",
+            headers=_auth_headers(),
+            json={
+                "prompt": "a watercolor painting",
+                "model": "gpt-image-1",
+                "providers": ["openai"],
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["status"] == "submitted"
+        assert data["provider"] == "openai"
+        job_id = data["job_id"]
+
+        # Simulate the background task POSTing the result back to ourselves.
+        cb_resp = client.post(
+            f"/v1/callback/openai/{job_id}",
+            json={
+                "provider_job_id": "openai-abc123",
+                "status": "succeeded",
+                "image_url": "https://oaidalleapiprodscus.blob.core.windows.net/result.png",
+            },
+        )
+        assert cb_resp.status_code == 200
+
+        get_resp = client.get(f"/v1/jobs/{job_id}", headers=_auth_headers())
+        assert get_resp.json()["status"] == "succeeded"
+        assert "oaidalleapiprodscus" in get_resp.json()["image_url"]
 
 
 def test_text_to_image_model_ignores_input_image(tmp_db_path):

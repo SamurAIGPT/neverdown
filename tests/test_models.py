@@ -38,6 +38,14 @@ def test_providers_for_replicate_only_model():
     assert models.providers_for("ideogram-v3-quality") == {"replicate"}
 
 
+def test_providers_for_openai_only_model():
+    """OpenAI's models live only on OpenAI (no Fal/Replicate equivalent for gpt-image-1)."""
+    assert models.providers_for("gpt-image-1") == {"openai"}
+    assert models.providers_for("dall-e-3") == {"openai"}
+    assert models.providers_for("dall-e-2") == {"openai"}
+    assert models.resolve_for_provider("gpt-image-1", "openai") == "gpt-image-1"
+
+
 def test_providers_for_unknown_returns_empty():
     """An empty set means 'unknown to registry' — caller should let all providers try."""
     assert models.providers_for("totally-made-up-model") == set()

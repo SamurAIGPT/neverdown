@@ -184,6 +184,19 @@ REGISTRY: Dict[str, ModelInfo] = {info.canonical: info for info in [
     _e("bria",
        family="bria", description="Bria text-to-image — trained exclusively on licensed data",
        fal="fal-ai/bria/text-to-image/base"),
+
+    # ── OpenAI (direct, sync API) ───────────────────────────────────────────
+    # OpenAI's image API is synchronous — no webhooks. The OpenAIProvider uses a
+    # submit-then-self-callback pattern to fit the gateway's webhook-first flow.
+    _e("gpt-image-1",
+       family="gpt-image", description="OpenAI gpt-image-1 — current flagship image model",
+       openai="gpt-image-1"),
+    _e("dall-e-3",
+       family="dall-e", description="OpenAI DALL-E 3 — text-to-image",
+       openai="dall-e-3"),
+    _e("dall-e-2",
+       family="dall-e", description="OpenAI DALL-E 2 — older, cheaper, still hosted",
+       openai="dall-e-2"),
 ]}
 
 
