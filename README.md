@@ -248,11 +248,21 @@ Library mode runs a polling loop in your own process — see the "Why a gateway"
 
 ## Supported models
 
-| Model | Key |
-|---|---|
-| FLUX.1 Dev | `flux-dev` |
-| FLUX.1 Schnell | `flux-schnell` |
-| FLUX.1 Pro | `flux-pro` |
+The catalog is a curated registry — every entry is mapped to provider slugs so the gateway knows which providers can serve it. Unknown model names pass through verbatim, so you can hit a private Fal deployment with the raw slug (e.g. `fal-ai/your-org/your-model`) without registering it first.
+
+| Family | Canonical names | Providers |
+|---|---|---|
+| **FLUX (Black Forest Labs)** | `flux-dev`, `flux-schnell`, `flux-pro`, `flux-1.1-pro`, `flux-1.1-pro-ultra`, `flux-realism`, `flux-redux` | Fal + Replicate (most) |
+| **FLUX Kontext** (img2img edit) | `flux-kontext-pro`, `flux-kontext-max` | Fal + Replicate |
+| **Stable Diffusion** | `sd3`, `sd3.5-large`, `sd3.5-large-turbo`, `sd3.5-medium`, `sdxl` | Fal + Replicate |
+| **Ideogram** (great at text in images) | `ideogram-v2`, `ideogram-v2-turbo`, `ideogram-v3`, `ideogram-v3-quality`, `ideogram-v3-turbo` | Fal + Replicate |
+| **Recraft** (logos / SVG) | `recraft-v3`, `recraft-v3-svg` | Fal + Replicate |
+| **Imagen (Google)** | `imagen-3`, `imagen-3-fast`, `imagen-4` | Fal + Replicate |
+| **Nano Banana (Google)** | `nano-banana`, `nano-banana-pro`, `nano-banana-edit` | Fal-only |
+| **Luma Photon** | `luma-photon`, `luma-photon-flash` | Fal-only |
+| **Bria** (commercial-safe) | `bria-2.3` | Fal-only |
+
+When you ask for a Fal-only model with `providers=["fal", "replicate"]`, the gateway automatically drops `replicate` from the failover chain and logs the reason in the job's `attempts`. To add a model to the registry, edit [`pixelrelay/models.py`](pixelrelay/models.py) — one row per model.
 
 ---
 

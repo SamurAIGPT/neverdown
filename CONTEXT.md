@@ -55,6 +55,7 @@ pixelrelay/
 │   ├── core.py                   # generate() — SDK library mode
 │   ├── cooldown.py               # CooldownTracker (library mode only)
 │   ├── exceptions.py             # PixelrelayError + ProviderError hierarchy
+│   ├── models.py                 # Canonical model registry — one row per model, mapped to provider slugs
 │   ├── providers/
 │   │   ├── base.py               # BaseProvider, GenerationResult, SubmitResult, CallbackPayload
 │   │   ├── fal.py                # generate() + submit_async() + parse_callback()
@@ -97,6 +98,7 @@ pixelrelay/
 1. Auth check (bearer token)
 2. Create `Job` row in DB with `status=queued`, `providers_remaining=[fal, replicate]`
 3. `Dispatcher.submit_next_provider(job)`:
+   - Look up model in `pixelrelay.models.providers_for(canonical)` — if known, filter `providers_remaining` to only providers that serve the model (skip e.g. Replicate when model is `nano-banana`). Unknown models pass through unfiltered.
    - Iterate `providers_remaining`, skip those in cooldown (DB lookup)
    - Call `provider.submit_async(prompt, model, webhook_url=callback_url)`
    - On `ProviderUnavailableError` → mark cooldown in DB, log attempt, continue
@@ -188,7 +190,18 @@ See README "Configuration" section for the full env-var table. Key ones:
 
 ## Roadmap
 
-### v0.2.1 — Replicate-compatible API
+### v0.2.1 — Expanded model catalog ✅ SHIPPED
+- `pixelrelay/models.py` registry maps canonical names → provider slugs
+- ~30 models: FLUX family (dev/schnell/pro/1.1-pro/1.1-pro-ultra/realism/redux/kontext), SD3/3.5/SDXL, Ideogram v2/v3 family, Recraft v3 + SVG, Imagen 3/4, Nano Banana (Fal-only), Luma Photon (Fal-only), Bria
+- Dispatcher auto-filters failover chain to providers that actually serve the requested model
+- Unknown models pass through (devs can use raw provider slugs without registering)
+
+### v0.2.2 — Image-edit API support
+- Add optional `input_image` field to `GenerateRequest` for img2img / image-edit models
+- Wire into Nano Banana edit, FLUX Kontext, Recraft v3 edit
+- Validate at submit time: image-edit models require `input_image`
+
+### v0.2.3 — Replicate-compatible API
 - `POST /v1/predictions` matching Replicate's spec exactly (drop-in `replicate` SDK migration target)
 - `GET /v1/predictions/{id}` mirroring Replicate's prediction object shape
 - Strategy: use the same Job table, just expose a different request/response shape

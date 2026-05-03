@@ -11,6 +11,7 @@ from ..exceptions import (
     JobTimeoutError,
     ProviderUnavailableError,
 )
+from ..models import providers_for
 from ..providers.base import BaseProvider
 from .config import GatewayConfig
 from .models import Job
@@ -48,11 +49,25 @@ class Dispatcher:
         """Try providers in `providers_remaining` order until one accepts the job
         or all have been tried. Updates the job in the store accordingly."""
         now = _utcnow()
+        # If the model is in the registry, only try providers that actually serve it.
+        # Unknown models pass through (empty set means "no opinion, let them all try").
+        supported = providers_for(job.model)
         for provider_name in list(job.providers_remaining or []):
             if provider_name not in self.providers:
                 await self.jobs.add_attempt(
                     job.id,
                     {"provider": provider_name, "error": "provider not configured", "at": now.isoformat()},
+                )
+                continue
+
+            if supported and provider_name not in supported:
+                await self.jobs.add_attempt(
+                    job.id,
+                    {
+                        "provider": provider_name,
+                        "error": f"model '{job.model}' not available on {provider_name}",
+                        "at": now.isoformat(),
+                    },
                 )
                 continue
 

@@ -7,12 +7,7 @@ import httpx
 
 from .base import BaseProvider, CallbackPayload, GenerationResult, SubmitResult
 from ..exceptions import JobFailedError, JobTimeoutError, ProviderUnavailableError
-
-REPLICATE_MODEL_MAP = {
-    "flux-dev": "black-forest-labs/flux-dev",
-    "flux-schnell": "black-forest-labs/flux-schnell",
-    "flux-pro": "black-forest-labs/flux-pro",
-}
+from ..models import resolve_for_provider
 
 POLL_INTERVAL = 2.0
 
@@ -24,7 +19,7 @@ class ReplicateProvider(BaseProvider):
         self.api_key = api_key
 
     def _resolve_model(self, model: str) -> str:
-        return REPLICATE_MODEL_MAP.get(model, model)
+        return resolve_for_provider(model, self.name)
 
     async def generate(
         self,

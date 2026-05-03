@@ -7,12 +7,7 @@ import httpx
 
 from .base import BaseProvider, CallbackPayload, GenerationResult, SubmitResult
 from ..exceptions import JobFailedError, JobTimeoutError, ProviderUnavailableError
-
-FAL_MODEL_MAP = {
-    "flux-dev": "fal-ai/flux/dev",
-    "flux-schnell": "fal-ai/flux/schnell",
-    "flux-pro": "fal-ai/flux-pro",
-}
+from ..models import resolve_for_provider
 
 POLL_INTERVAL = 2.0
 
@@ -24,7 +19,7 @@ class FalProvider(BaseProvider):
         self.api_key = api_key
 
     def _resolve_model(self, model: str) -> str:
-        return FAL_MODEL_MAP.get(model, model)
+        return resolve_for_provider(model, self.name)
 
     async def generate(
         self,
