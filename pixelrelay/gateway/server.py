@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from ..providers.base import BaseProvider
 from ..providers.fal import FalProvider
+from ..providers.google import GoogleProvider
 from ..providers.openai import OpenAIProvider
 from ..providers.replicate import ReplicateProvider
 from .auth import make_auth_dependency
@@ -33,6 +34,8 @@ def _build_provider_registry(config: GatewayConfig) -> Dict[str, BaseProvider]:
         registry["replicate"] = ReplicateProvider(api_key=config.replicate_token)
     if config.openai_key:
         registry["openai"] = OpenAIProvider(api_key=config.openai_key)
+    if config.google_key:
+        registry["google"] = GoogleProvider(api_key=config.google_key)
     return registry
 
 

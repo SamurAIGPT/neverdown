@@ -24,11 +24,24 @@ def test_providers_for_known_multiprovider_model():
 
 
 def test_providers_for_fal_only_model():
-    assert models.providers_for("nano-banana") == {"fal"}
-    assert models.providers_for("nano-banana-2") == {"fal"}
-    assert models.providers_for("nano-banana-pro") == {"fal"}
     assert models.providers_for("luma-photon") == {"fal"}
     assert models.providers_for("bria") == {"fal"}
+
+
+def test_providers_for_nano_banana_dual_routed():
+    """Nano Banana is now reachable via Fal OR Google direct."""
+    assert models.providers_for("nano-banana") == {"fal", "google"}
+    assert models.providers_for("nano-banana-2") == {"fal", "google"}
+    assert models.providers_for("nano-banana-pro") == {"fal", "google"}
+    # Fal has its specific slug; Google uses the Gemini model ID.
+    assert models.resolve_for_provider("nano-banana", "fal") == "fal-ai/nano-banana"
+    assert models.resolve_for_provider("nano-banana", "google") == "gemini-2.5-flash-image"
+
+
+def test_imagen_4_routes_to_three_providers():
+    assert models.providers_for("imagen-4") == {"fal", "replicate", "google"}
+    assert models.resolve_for_provider("imagen-4", "google") == "imagen-4.0-generate-001"
+    assert models.resolve_for_provider("imagen-4-ultra", "google") == "imagen-4.0-ultra-generate-001"
 
 
 def test_providers_for_replicate_only_model():

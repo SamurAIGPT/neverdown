@@ -36,7 +36,12 @@ def tmp_db_path():
         yield Path(d) / "test.db"
 
 
-def _make_config(db_path: Path, *, with_openai: bool = False) -> GatewayConfig:
+def _make_config(
+    db_path: Path,
+    *,
+    with_openai: bool = False,
+    with_google: bool = False,
+) -> GatewayConfig:
     return GatewayConfig(
         gateway_api_key="test-key",
         auth_disabled=False,
@@ -45,6 +50,7 @@ def _make_config(db_path: Path, *, with_openai: bool = False) -> GatewayConfig:
         fal_key="fake-fal-key",
         replicate_token="fake-replicate-token",
         openai_key="fake-openai-key" if with_openai else None,
+        google_key="fake-google-key" if with_google else None,
         default_providers=["fal", "replicate"],
         fal_webhook_public_key=None,  # disable verification in tests
         replicate_webhook_secret=None,
@@ -270,6 +276,53 @@ def test_openai_self_callback_completes_job(tmp_db_path):
         get_resp = client.get(f"/v1/jobs/{job_id}", headers=_auth_headers())
         assert get_resp.json()["status"] == "succeeded"
         assert "oaidalleapiprodscus" in get_resp.json()["image_url"]
+
+
+def test_google_provider_registered_when_key_set(tmp_db_path):
+    app = create_app(_make_config(tmp_db_path, with_google=True))
+    with TestClient(app) as client:
+        assert "google" in app.state.providers
+        assert client.get("/health").status_code == 200
+
+
+def test_google_self_callback_completes_job(tmp_db_path):
+    """End-to-end Google flow: submit, simulate self-callback with a data URI,
+    job becomes succeeded with the image_url set to the data URI."""
+    app = create_app(_make_config(tmp_db_path, with_google=True))
+    with TestClient(app) as client:
+        google_provider = app.state.providers["google"]
+        google_provider.submit_async = AsyncMock(
+            return_value=SubmitResult(provider_job_id="google-xyz", raw={})
+        )
+
+        resp = client.post(
+            "/v1/generate",
+            headers=_auth_headers(),
+            json={
+                "prompt": "a banana spaceship",
+                "model": "nano-banana",
+                "providers": ["google"],
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        job_id = resp.json()["job_id"]
+        assert resp.json()["provider"] == "google"
+
+        # Simulate the background task POSTing back with a data URI image_url
+        data_uri = "data:image/png;base64,iVBORw0KGgoAAAANS"  # truncated
+        cb_resp = client.post(
+            f"/v1/callback/google/{job_id}",
+            json={
+                "provider_job_id": "google-xyz",
+                "status": "succeeded",
+                "image_url": data_uri,
+            },
+        )
+        assert cb_resp.status_code == 200
+
+        get_resp = client.get(f"/v1/jobs/{job_id}", headers=_auth_headers())
+        assert get_resp.json()["status"] == "succeeded"
+        assert get_resp.json()["image_url"].startswith("data:image/")
 
 
 def test_text_to_image_model_ignores_input_image(tmp_db_path):

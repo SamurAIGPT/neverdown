@@ -23,6 +23,7 @@ class GatewayConfig:
     fal_key: Optional[str]
     replicate_token: Optional[str]
     openai_key: Optional[str]
+    google_key: Optional[str]
 
     # Default provider order
     default_providers: List[str]
@@ -48,6 +49,7 @@ class GatewayConfig:
             fal_key=os.environ.get("FAL_KEY"),
             replicate_token=os.environ.get("REPLICATE_API_TOKEN"),
             openai_key=os.environ.get("OPENAI_API_KEY"),
+            google_key=os.environ.get("GOOGLE_API_KEY"),
             default_providers=[
                 p.strip()
                 for p in os.environ.get("PIXELRELAY_PROVIDERS", "fal,replicate").split(",")
@@ -71,8 +73,8 @@ class GatewayConfig:
                 "PIXELRELAY_GATEWAY_KEY is required. "
                 "Generate one with `openssl rand -hex 32`, or set PIXELRELAY_AUTH=none for local dev."
             )
-        if not (self.fal_key or self.replicate_token or self.openai_key):
+        if not (self.fal_key or self.replicate_token or self.openai_key or self.google_key):
             raise RuntimeError(
                 "At least one provider key is required "
-                "(FAL_KEY, REPLICATE_API_TOKEN, or OPENAI_API_KEY)."
+                "(FAL_KEY, REPLICATE_API_TOKEN, OPENAI_API_KEY, or GOOGLE_API_KEY)."
             )

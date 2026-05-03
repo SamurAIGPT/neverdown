@@ -215,11 +215,22 @@ See README "Configuration" section for the full env-var table. Key ones:
 - Restart trade-off: in-flight asyncio task is lost on gateway restart; deadline worker catches orphan via failover. One wasted OpenAI request, no lost job. Proper task queue is a v1.0 concern.
 - Image edit support (`/v1/images/edits` multipart) deferred to v0.2.4+; gpt-image-1 ships text-to-image only.
 
-### v0.2.4 — Google provider
-- New `GoogleProvider` for Nano Banana via Gemini API direct (not just via Fal)
-- Imagen via AI Studio API key
-- Env: `GOOGLE_API_KEY`
-- Sync-to-self-callback pattern shared with OpenAI provider
+### v0.2.4 — Google provider ✅ SHIPPED
+- New `GoogleProvider` in `pixelrelay/providers/google.py`
+- Same submit-then-self-callback pattern as OpenAI; new `/v1/callback/google/{job_id}` route (no signature verification — loopback trust)
+- Two endpoint shapes per model family:
+  - **Gemini image models** (Nano Banana family): `POST /v1beta/models/{model}:generateContent` with `contents/parts/generationConfig`. Response `candidates[].content.parts[].inlineData.data` (base64).
+  - **Imagen 4**: `POST /v1beta/models/{model}:predict` with `instances/parameters`. Response `predictions[].bytesBase64Encoded` (base64).
+- Both return base64; provider wraps as `data:image/png;base64,...` data URI in the `image_url` field. Webhook payloads ~1.4× raw image size; storage-backed URL serving is a v0.3 follow-up.
+- Image-edit support: Gemini accepts an `inline_data` part alongside text; provider auto-includes the `input_image` if it's a data URI. URL fetching for input_image deferred (caller pre-encodes).
+- Verified Gemini model IDs (against ai.google.dev/gemini-api/docs):
+  - `gemini-2.5-flash-image` (Nano Banana)
+  - `gemini-3.1-flash-image-preview` (Nano Banana 2)
+  - `gemini-3-pro-image-preview` (Nano Banana Pro)
+- Verified Imagen 4 model IDs:
+  - `imagen-4.0-generate-001`, `imagen-4.0-fast-generate-001`, `imagen-4.0-ultra-generate-001`
+- Imagen 3 has been shut down per Google's docs; we kept the `imagen-3`/`imagen-3-fast` registry entries pointing to Fal/Replicate which may still proxy.
+- Env: `GOOGLE_API_KEY` (AI Studio); auth via `x-goog-api-key` header. validate() now accepts any of FAL/REPLICATE/OPENAI/GOOGLE.
 
 ### v0.2.3 — Replicate-compatible API
 - `POST /v1/predictions` matching Replicate's spec exactly (drop-in `replicate` SDK migration target)

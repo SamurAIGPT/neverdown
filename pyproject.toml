@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pixelrelay"
-version = "0.2.3"
+version = "0.2.4"
 description = "Self-hosted unified API for generative media. One webhook-native endpoint across Fal, Replicate, and more — bring your own keys, get persistent jobs and automatic provider failover for free."
 readme = "README.md"
 requires-python = ">=3.9"

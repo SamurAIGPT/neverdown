@@ -33,6 +33,12 @@ async def openai_callback(job_id: str, request: Request) -> dict:
     return await _handle_callback(request, job_id, provider_name="openai")
 
 
+@router.post("/v1/callback/google/{job_id}")
+async def google_callback(job_id: str, request: Request) -> dict:
+    """Same self-callback pattern as OpenAI — Google's image APIs are sync."""
+    return await _handle_callback(request, job_id, provider_name="google")
+
+
 async def _handle_callback(request: Request, job_id: str, *, provider_name: str) -> dict:
     config = request.app.state.config
     dispatcher = request.app.state.dispatcher
@@ -47,10 +53,10 @@ async def _handle_callback(request: Request, job_id: str, *, provider_name: str)
     elif provider_name == "replicate":
         if not verify_replicate(headers, body, config.replicate_webhook_secret):
             raise HTTPException(status_code=401, detail="invalid replicate signature")
-    elif provider_name == "openai":
+    elif provider_name in ("openai", "google"):
         # Self-callback from the gateway's own background task. The unguessable
         # UUID job_id in the path is the auth boundary; no external signature
-        # to verify since OpenAI doesn't sign anything.
+        # to verify since these APIs don't sign anything.
         pass
 
     provider = providers.get(provider_name)
