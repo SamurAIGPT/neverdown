@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "pixelrelay"
 version = "0.2.0"
-description = "Self-hosted failover gateway for generative media APIs. Pixelrelay routes your image and video jobs across Fal, Replicate, and more — with webhooks, persistent state, and automatic provider failover."
+description = "Self-hosted unified API for generative media. One webhook-native endpoint across Fal, Replicate, and more — bring your own keys, get persistent jobs and automatic provider failover for free."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "Apache-2.0" }

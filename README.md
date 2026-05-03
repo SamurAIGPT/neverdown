@@ -1,8 +1,8 @@
 # Pixelrelay
 
-**Self-hosted failover gateway for generative media APIs. Bring your own keys, run it next to your app, and never lose a job to a provider outage.**
+**The open-source, self-hosted gateway for generative media APIs. One webhook-native endpoint across Fal, Replicate, and more — with your own keys, in your own infra.**
 
-When Fal goes down, Pixelrelay submits your image or video job to Replicate, persists state in your own database, and POSTs the result to your webhook when ready. Polling-only SDKs lose jobs on restart and burn process time waiting; the gateway doesn't.
+Pixelrelay unifies image and video generation across providers behind a single async API. You bring the keys, it handles the job lifecycle: persisted state in your own database, webhook callbacks instead of polling, and automatic provider failover when one goes down.
 
 ```bash
 docker run -p 8000:8000 \
@@ -30,6 +30,16 @@ curl -X POST http://localhost:8000/v1/generate \
 When the job finishes, your `webhook_url` receives a signed POST with the result.
 
 ---
+
+## What it gives you
+
+| | |
+|---|---|
+| **Unified API** | One endpoint, one auth header — talks to Fal, Replicate, and (soon) RunPod, Stability, Runway. Same shape across providers. |
+| **Webhooks-first** | Provider POSTs result asynchronously; gateway forwards to your `webhook_url`. No client-side polling, no held connections. |
+| **Persistent jobs** | Job state in SQLite (default) or Postgres. Survives restarts, shared across replicas, full audit trail at `GET /v1/jobs`. |
+| **Automatic failover** | Provider down or hung past deadline? The gateway cools it down and resubmits to the next one — your app never sees the error. |
+| **BYOK, self-hosted** | You run it, you own the data, you keep your provider rate limits. No billing layer, no markup, no lock-in. |
 
 ## Why a gateway, not just an SDK
 

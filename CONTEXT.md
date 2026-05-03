@@ -10,9 +10,16 @@
 
 ## What is Pixelrelay?
 
-A **self-hosted failover gateway for generative media APIs** (Fal.ai, Replicate, future: RunPod, Runway, Kling). Bring your own provider keys, run the gateway next to your app, and never lose a job to a provider outage.
+The **open-source, self-hosted unified API for generative media** (Fal.ai, Replicate, future: RunPod, Stability, Runway, Kling). Bring your own provider keys, run it next to your app, get one async endpoint that talks to all of them.
 
-**Core insight:** A polling-only SDK fails at production scale because it holds a process open for the whole job duration (10–300s for video), loses state on restart, can't share cooldown across instances, and wastes the request budget waiting for a hung provider. A gateway with **webhooks + persistent job state** fixes all of this.
+**The product is the unified, webhook-native, BYOK gateway.** Three feature pillars sit underneath:
+1. **Unified API** — one shape, all providers (the primary value)
+2. **Webhooks + persistent jobs** — async by default, state survives restarts, shared across replicas
+3. **Automatic failover** — when a provider goes down, the gateway routes around it (a feature, not the headline)
+
+**Why not just an SDK:** A polling-only SDK fails at production scale because it holds a process open for the whole job duration (10–300s for video), loses state on restart, can't share cooldown across instances, and wastes the request budget waiting for a hung provider. The gateway with webhooks + persistent state fixes all of this.
+
+**Why not Lumenfall / closed gateways:** They're hosted services with their own billing, markup, and data plane. Pixelrelay is open source, self-hosted, BYOK — no rate-limit middleman, no vendor lock-in.
 
 **Architecture (one paragraph):** User's app POSTs to gateway with optional `webhook_url`. Gateway persists the job in DB (SQLite default, Postgres for prod), submits to first available provider with `webhook=<gateway>/v1/callback/<provider>/<job_id>`, returns `{job_id, status: "submitted"}` immediately. When provider completes, it POSTs back; gateway verifies signature (ed25519 for fal, HMAC-SHA256 for replicate), updates DB, forwards to user's webhook with our own HMAC-SHA256 signature. A background worker scans for jobs past deadline and triggers failover transparently.
 
