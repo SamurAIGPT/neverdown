@@ -1,11 +1,11 @@
-# neverdown
+# Pixelrelay
 
-**Automatic failover across generative AI providers. Never let your app go down when Fal or Replicate does.**
+**Automatic failover across generative media APIs. Pixelrelay hands off your image and video jobs to the next provider when Fal or Replicate goes down.**
 
-When Fal is down, neverdown automatically switches to Replicate. Your users never see an error.
+When Fal is down, Pixelrelay automatically switches to Replicate. Your users never see an error.
 
 ```python
-from neverdown import generate
+from pixelrelay import generate
 
 result = await generate(
     prompt="cinematic portrait of a woman in paris",
@@ -20,7 +20,7 @@ print(result.latency_ms)  # how long it took
 
 ## The problem
 
-Your app depends on generative AI providers that go down — Fal, Replicate, RunPod. When they do, your app breaks. You either wait it out or manually switch providers. Neither is acceptable in production.
+Your app depends on generative media providers that go down — Fal, Replicate, RunPod. When they do, your app breaks. You either wait it out or manually switch providers. Neither is acceptable in production.
 
 ## How it works
 
@@ -33,7 +33,7 @@ Your app depends on generative AI providers that go down — Fal, Replicate, Run
 ## Installation
 
 ```bash
-pip install neverdown
+pip install pixelrelay
 ```
 
 ## Setup
@@ -51,7 +51,7 @@ export REPLICATE_API_TOKEN=your_replicate_token
 
 ```python
 import asyncio
-from neverdown import generate
+from pixelrelay import generate
 
 async def main():
     result = await generate(
@@ -77,7 +77,7 @@ result = await generate(
 
 ```python
 import asyncio
-from neverdown import generate
+from pixelrelay import generate
 
 results = await asyncio.gather(
     generate(prompt="photo 1", model="flux-dev"),
@@ -89,8 +89,8 @@ results = await asyncio.gather(
 ### Error handling
 
 ```python
-from neverdown import generate
-from neverdown.exceptions import AllProvidersFailedError
+from pixelrelay import generate
+from pixelrelay.exceptions import AllProvidersFailedError
 
 try:
     result = await generate(prompt="...", model="flux-dev")
@@ -133,7 +133,7 @@ result.latency_ms   # float — end-to-end latency in milliseconds
 
 ## Contributing
 
-Pull requests are welcome. To add a new provider, implement `BaseProvider` in `neverdown/providers/` and register it in `core.py`.
+Pull requests are welcome. To add a new provider, implement `BaseProvider` in `pixelrelay/providers/` and register it in `core.py`.
 
 ## License
 

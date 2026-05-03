@@ -1,26 +1,28 @@
-# neverdown — Full Project Context
+# Pixelrelay — Full Project Context
 
-> This document is the canonical reference for the neverdown project. Read this at the start of any new session before making changes.
+> This document is the canonical reference for the Pixelrelay project. Read this at the start of any new session before making changes.
+
+> **Renamed from `neverdown` → `pixelrelay`.** The new name signals media-API specialization (pixel) and the failover handoff (relay), avoiding the LLM-gateway connotations of names like Portkey/LiteLLM and the defensive "promise you can't always keep" of the old name.
 
 ---
 
-## What is neverdown?
+## What is Pixelrelay?
 
-A Python SDK that provides **automatic async failover across generative AI providers** (Fal.ai, Replicate, and future providers). When one provider goes down, it automatically switches to the next. Users never see an error.
+A Python SDK that provides **automatic async failover across generative media APIs** (Fal.ai, Replicate, and future providers). When one provider goes down, it automatically switches to the next. Users never see an error.
 
-**Core insight:** Unlike LLM gateways (Portkey, LiteLLM, OpenRouter) which route synchronous text requests, neverdown handles *async jobs* — submit → poll → result — which is fundamentally different and requires job lifecycle management, not just request routing.
+**Core insight:** Unlike LLM gateways (Portkey, LiteLLM, OpenRouter) which route synchronous text requests, Pixelrelay handles *async media jobs* — submit → poll → result — which is fundamentally different and requires job lifecycle management, not just request routing. The product is media-API specialized (image now, video later), not LLM.
 
-**GitHub:** https://github.com/SamurAIGPT/neverdown
+**GitHub:** https://github.com/SamurAIGPT/pixelrelay
 **License:** Apache 2.0
 **Language:** Python 3.9+
-**Local path:** `/Users/anilchandranaidumatcha/Downloads/neverdown/`
+**Local path:** `/Users/anilchandranaidumatcha/Downloads/pixelrelay/`
 
 ---
 
 ## Current API (v0.1.0)
 
 ```python
-from neverdown import generate
+from pixelrelay import generate
 
 result = await generate(
     prompt="cinematic portrait of a woman in paris",
@@ -40,8 +42,8 @@ result.latency_ms   # float — end-to-end latency
 ## Project Structure
 
 ```
-neverdown/
-├── neverdown/
+pixelrelay/
+├── pixelrelay/
 │   ├── __init__.py          # public exports: generate, GenerationResult, exceptions
 │   ├── core.py              # generate() — main entry point, fallback loop, cooldown logic
 │   ├── cooldown.py          # CooldownTracker — marks failed providers, skips during cooldown
@@ -107,7 +109,7 @@ neverdown/
 ## Exception Hierarchy
 
 ```
-NeverDownError
+PixelrelayError
 ├── ProviderError(provider, status_code)
 │   ├── ProviderUnavailableError   — 5xx, connection error, unreachable → triggers cooldown
 │   ├── JobFailedError             — job submitted but failed → no cooldown
@@ -128,6 +130,7 @@ NeverDownError
 | Per-call timeout, not global | Each provider gets full timeout budget independently |
 | Open-core strategy | SDK is open, future hosted routing intelligence is paid |
 | Apache 2.0 license | Patent protection vs MIT, enterprise-friendly, used by LiteLLM/Portkey |
+| Media-specialized name (Pixelrelay) | Differentiates from LLM gateways; signals the actual product domain |
 
 ---
 
@@ -138,7 +141,7 @@ NeverDownError
 - **Error normalization:** always map provider errors to your own exception types — never leak raw provider errors
 - **Cooldown:** LiteLLM uses 60s cooldown after N failures per minute
 - **Retry vs fallback:** retries = transient errors on same provider; fallback = switch provider entirely
-- **Our difference:** both are sync/LLM-first; we are async/job-first which requires polling loop as first-class concern
+- **Our difference:** both are sync/LLM-first; we are async/media-job-first which requires polling loop as first-class concern
 
 ---
 
@@ -146,7 +149,7 @@ NeverDownError
 
 - **Target:** Indie devs and small AI startups building on Fal/Replicate who feel outage pain
 - **Distribution channels:** Fal Discord, Replicate Discord, X/Twitter, Reddit
-- **Positioning:** "Never let your AI app go down when Fal or Replicate fails" — not "AI gateway"
+- **Positioning:** "Failover for generative media APIs — when Fal is down, Pixelrelay hands off to Replicate" — not "AI gateway"
 - **Open-core:** SDK open, future hosted intelligence (smart routing, analytics, cost optimization) paid
 - **Wedge feature:** 1-line failover. Sell reliability, not platform.
 - **Growth loop:** Post in Discord communities where users already complain about outages
@@ -155,7 +158,7 @@ NeverDownError
 
 ## Competitors
 
-| Tool | What it does | Gap vs neverdown |
+| Tool | What it does | Gap vs Pixelrelay |
 |------|-------------|------------------|
 | LiteLLM | LLM gateway, basic Fal/Replicate support | Sync/LLM-first, no async job lifecycle |
 | Portkey | LLM control plane | LLM-focused, not built for GPU async jobs |
@@ -209,7 +212,7 @@ NeverDownError
 
 ## Adding a New Provider (How-To)
 
-1. Create `neverdown/providers/{name}.py`
+1. Create `pixelrelay/providers/{name}.py`
 2. Implement `BaseProvider`:
    ```python
    class NewProvider(BaseProvider):

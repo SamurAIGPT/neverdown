@@ -1,9 +1,9 @@
-class NeverDownError(Exception):
-    """Base exception for neverdown."""
+class PixelrelayError(Exception):
+    """Base exception for pixelrelay."""
     pass
 
 
-class ProviderError(NeverDownError):
+class ProviderError(PixelrelayError):
     """Error from a specific provider."""
     def __init__(self, message: str, provider: str, status_code: int = None):
         self.provider = provider
@@ -26,7 +26,7 @@ class JobTimeoutError(ProviderError):
     pass
 
 
-class AllProvidersFailedError(NeverDownError):
+class AllProvidersFailedError(PixelrelayError):
     """All providers in the list failed."""
     def __init__(self, errors: dict):
         self.errors = errors  # {provider: exception}

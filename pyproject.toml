@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "neverdown"
+name = "pixelrelay"
 version = "0.1.0"
-description = "Automatic failover across generative AI providers. Never let your app go down when Fal or Replicate does."
+description = "Automatic failover across generative media APIs. Pixelrelay hands off your image and video jobs to the next provider when Fal or Replicate goes down."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "Apache-2.0" }

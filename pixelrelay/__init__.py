@@ -1,7 +1,7 @@
 from .core import generate
 from .providers.base import GenerationResult
 from .exceptions import (
-    NeverDownError,
+    PixelrelayError,
     AllProvidersFailedError,
     ProviderUnavailableError,
     JobFailedError,
@@ -11,7 +11,7 @@ from .exceptions import (
 __all__ = [
     "generate",
     "GenerationResult",
-    "NeverDownError",
+    "PixelrelayError",
     "AllProvidersFailedError",
     "ProviderUnavailableError",
     "JobFailedError",
