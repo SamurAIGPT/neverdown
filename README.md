@@ -1,13 +1,24 @@
 # Pixelrelay
 
-**The open-source, self-hosted gateway for generative media APIs. One webhook-native endpoint across Fal, Replicate, and more — with your own keys, in your own infra.**
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org)
+[![GitHub stars](https://img.shields.io/github/stars/SamurAIGPT/pixelrelay?style=social)](https://github.com/SamurAIGPT/pixelrelay)
+[![Issues](https://img.shields.io/github/issues/SamurAIGPT/pixelrelay)](https://github.com/SamurAIGPT/pixelrelay/issues)
 
-Pixelrelay unifies image and video generation across providers behind a single async API. You bring the keys, it handles the job lifecycle: persisted state in your own database, webhook callbacks instead of polling, and automatic provider failover when one goes down.
+**Route AI image and video generation across 35+ models with one webhook-native, BYOK API. Self-hosted, open source.**
+
+- ⚡ **One async endpoint across all providers** — webhook-first, not polling
+- 🔑 **Bring your own keys, run it next to your app** — no billing layer, no markup, no lock-in
+- 🛟 **Persistent jobs + automatic failover** — survives restarts, scales horizontally, transparent provider switching when one goes down
+
+---
+
+## Quickstart (60 seconds)
 
 ```bash
 docker run -p 8000:8000 \
   -e PIXELRELAY_GATEWAY_KEY=$(openssl rand -hex 32) \
-  -e PIXELRELAY_PUBLIC_URL=https://gateway.example.com \
+  -e PIXELRELAY_PUBLIC_URL=https://your-tunnel.example.com \
   -e FAL_KEY=$FAL_KEY \
   -e REPLICATE_API_TOKEN=$REPLICATE_API_TOKEN \
   -v pixelrelay_data:/data \
@@ -20,14 +31,16 @@ curl -X POST http://localhost:8000/v1/generate \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "cinematic portrait of a woman in paris",
-    "model": "flux-dev",
+    "model": "flux-1.1-pro",
     "providers": ["fal", "replicate"],
     "webhook_url": "https://your-app.example.com/pixelrelay-webhook"
   }'
 # → { "job_id": "...", "status": "submitted", "provider": "fal", ... }
 ```
 
-When the job finishes, your `webhook_url` receives a signed POST with the result.
+When the job finishes, your `webhook_url` receives a signed POST with the result. **No polling on your side.**
+
+> `PIXELRELAY_PUBLIC_URL` must be reachable by Fal/Replicate to deliver the callback. For local dev, expose with `ngrok http 8000` or `cloudflared tunnel`.
 
 ---
 
@@ -35,11 +48,43 @@ When the job finishes, your `webhook_url` receives a signed POST with the result
 
 | | |
 |---|---|
-| **Unified API** | One endpoint, one auth header — talks to Fal, Replicate, and (soon) RunPod, Stability, Runway. Same shape across providers. |
-| **Webhooks-first** | Provider POSTs result asynchronously; gateway forwards to your `webhook_url`. No client-side polling, no held connections. |
+| **Unified API** | One endpoint, one auth header — talks to Fal, Replicate, and (soon) RunPod, Stability, Runway. Same request shape across providers. |
+| **Webhooks-first** | Provider POSTs the result asynchronously; the gateway forwards it to your `webhook_url`. No client-side polling, no held connections. |
 | **Persistent jobs** | Job state in SQLite (default) or Postgres. Survives restarts, shared across replicas, full audit trail at `GET /v1/jobs`. |
 | **Automatic failover** | Provider down or hung past deadline? The gateway cools it down and resubmits to the next one — your app never sees the error. |
 | **BYOK, self-hosted** | You run it, you own the data, you keep your provider rate limits. No billing layer, no markup, no lock-in. |
+| **Verified model registry** | 35+ image models — every slug verified against fal.ai / replicate.com live pages. Unknown slugs pass through. |
+
+---
+
+## How it works
+
+```mermaid
+sequenceDiagram
+    participant App as Your App
+    participant GW as Pixelrelay Gateway
+    participant DB as Job Store
+    participant Fal as Fal.ai
+    participant Hook as Your /webhook
+
+    App->>GW: POST /v1/generate { prompt, webhook_url }
+    GW->>DB: INSERT job (status=queued)
+    GW->>Fal: POST /flux/dev?fal_webhook=GW/callback/...
+    Fal-->>GW: 202 { request_id }
+    GW->>DB: UPDATE status=submitted
+    GW-->>App: { job_id, status: "submitted" }
+
+    Note over Fal: 5–30s of generation
+
+    Fal->>GW: POST /v1/callback/fal/{job_id} (ed25519 signed)
+    GW->>GW: verify signature
+    GW->>DB: UPDATE status=succeeded, image_url=...
+    GW->>Hook: POST webhook_url (HMAC-SHA256 signed)
+
+    Note over GW,Fal: If Fal hung past deadline,<br/>the failover worker cools it down<br/>and resubmits to Replicate transparently
+```
+
+---
 
 ## Why a gateway, not just an SDK
 
@@ -49,46 +94,33 @@ A polling SDK breaks at production scale because:
 2. **State doesn't share** — cooldown lives in one Python process. 50 workers = 50 independent cooldown trackers.
 3. **Failover wastes the request budget** — if Fal hangs for 4 minutes before failover, your user already lost 4 minutes.
 
-The gateway fixes all three by:
-- Persisting job state in a database (SQLite by default, Postgres for production)
-- Receiving webhooks from providers asynchronously instead of polling
-- Sharing cooldown across all instances of the user's app
-- Forwarding the result to *your* webhook URL when the job completes
+The gateway fixes all three: persistent DB-backed state, webhook callbacks instead of polling, cooldown shared across replicas, transparent forwarding to your webhook.
 
 ---
 
-## Architecture
+## Compared to alternatives
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│ Your app                                                      │
-│   POST /v1/generate { prompt, webhook_url }   → fire & forget │
-└────────────────────────┬─────────────────────────────────────┘
-                         ↓
-┌──────────────────────────────────────────────────────────────┐
-│ Pixelrelay Gateway (self-hosted, BYOK)                        │
-│                                                               │
-│  1. Persist job in DB                                         │
-│  2. Submit to fal w/ webhook=<gateway>/v1/callback/fal/{id}   │
-│  3. Return { job_id, status: "submitted" } immediately        │
-│  4. fal POSTs result → gateway forwards to your webhook       │
-│                                                               │
-│  Failover (job-level deadline OR provider 5xx):               │
-│   → mark current provider in cooldown (DB-backed, shared)     │
-│   → resubmit to next provider with new callback URL           │
-│   → all transparent to your app                               │
-└──────────────────────────────────────────────────────────────┘
-```
+| | Pixelrelay | Lumenfall | Portkey / LiteLLM | Provider SDKs (replicate, fal-client, …) |
+|---|:---:|:---:|:---:|:---:|
+| Open source | ✅ Apache 2.0 | ❌ Closed | ✅ MIT / Apache | ✅ |
+| Self-hosted | ✅ | ❌ Hosted only | ✅ | n/a |
+| BYO keys (no billing layer) | ✅ direct to provider | ❌ they bill, no markup | ✅ | ✅ |
+| Media-native (image + video) | ✅ | ✅ | ❌ LLM-first | single provider |
+| Webhook-native (no polling) | ✅ | ❌ sync polling | ❌ sync | mixed |
+| Persistent jobs (DB-backed) | ✅ | ✅ | ❌ in-process | ❌ |
+| Multi-provider failover | ✅ | ✅ | ✅ (LLMs) | ❌ |
+
+**Use Pixelrelay if** you want a media-gen gateway you fully own, with webhooks, persistence, and failover across providers — without sending your jobs through someone else's billing layer.
 
 ---
 
 ## Install
 
 ```bash
-# Library + gateway
+# Gateway + library
 pip install "pixelrelay[gateway]"
 
-# Library only (in-process polling, no gateway server)
+# Library only (in-process polling, scripts/notebooks)
 pip install pixelrelay
 ```
 
@@ -122,7 +154,7 @@ python -m pixelrelay.gateway
 |---|---|---|
 | `PIXELRELAY_GATEWAY_KEY` | (required) | Bearer token clients use to authenticate |
 | `PIXELRELAY_AUTH` | (unset) | Set to `none` to disable auth (local dev only) |
-| `PIXELRELAY_PUBLIC_URL` | `http://localhost:8000` | URL fal/replicate POST callbacks back to. Must be reachable from the public internet. |
+| `PIXELRELAY_PUBLIC_URL` | `http://localhost:8000` | URL Fal/Replicate POST callbacks back to. Must be reachable from the public internet. |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./pixelrelay.db` | `postgresql+asyncpg://...` for production |
 | `FAL_KEY` | — | Provider key (BYOK) |
 | `REPLICATE_API_TOKEN` | — | Provider key (BYOK) |
@@ -146,7 +178,7 @@ Submit a generation job. Asynchronous by default.
 ```json
 {
   "prompt": "cinematic portrait of a woman in paris",
-  "model": "flux-dev",
+  "model": "flux-1.1-pro",
   "providers": ["fal", "replicate"],
   "webhook_url": "https://your-app.example.com/pixelrelay-webhook",
   "extra": { "seed": 42 }
@@ -161,7 +193,7 @@ Response:
   "job_id": "f3a2...",
   "status": "submitted",
   "provider": "fal",
-  "model": "flux-dev",
+  "model": "flux-1.1-pro",
   "prompt": "...",
   "image_url": null,
   "attempts": [],
@@ -181,7 +213,7 @@ List recent jobs (audit log).
 
 ### `POST /v1/callback/{provider}/{job_id}`
 
-Provider webhook receiver. Not called by users — fal and replicate POST here when jobs complete. Verified per-provider (ed25519 for fal, HMAC-SHA256 for replicate).
+Provider webhook receiver. Not called by users — Fal and Replicate POST here when jobs complete. Verified per-provider (ed25519 for Fal, HMAC-SHA256 for Replicate).
 
 ### `GET /health`
 
@@ -211,7 +243,7 @@ Payload:
   "job_id": "f3a2...",
   "status": "succeeded",
   "provider": "fal",
-  "model": "flux-dev",
+  "model": "flux-1.1-pro",
   "image_url": "https://fal.media/...",
   "error": null,
   "attempts": [{"provider": "fal", "cooldown": false, ...}]
@@ -222,7 +254,7 @@ Payload:
 
 ## Library mode (no gateway)
 
-For quick scripts and notebooks where a gateway is overkill, the library still works in-process via polling. Not recommended for production.
+For quick scripts and notebooks where a gateway is overkill, the library still works in-process via polling. **Not recommended for production** — see the gateway-vs-SDK section above.
 
 ```python
 import asyncio
@@ -235,20 +267,20 @@ async def main():
 asyncio.run(main())
 ```
 
-Library mode runs a polling loop in your own process — see the "Why a gateway" section above for why you probably don't want this in production.
-
 ---
 
-## Supported providers (v0.2.0)
+## Supported providers
 
 | Provider | Webhook support | Env var |
 |---|---|---|
 | [Fal.ai](https://fal.ai) | Native (ed25519-signed) | `FAL_KEY` |
 | [Replicate](https://replicate.com) | Native (HMAC-SHA256-signed) | `REPLICATE_API_TOKEN` |
 
+More on the roadmap: RunPod, Stability AI, Together, OpenAI, Google, Runway, Kling, Pika.
+
 ## Supported models
 
-Every slug in the registry is **verified against the provider's live model page** (fal.ai / replicate.com). Unknown canonical names pass through verbatim — devs can hit a private Fal deployment with `fal-ai/your-org/your-model` directly, no registration required.
+Every slug in the registry is **verified against the provider's live model page** (fal.ai / replicate.com). Unknown canonical names pass through verbatim — you can hit a private Fal deployment with `fal-ai/your-org/your-model` directly, no registration required.
 
 | Family | Canonical names | Providers |
 |---|---|---|
@@ -263,22 +295,31 @@ Every slug in the registry is **verified against the provider's live model page*
 | **Luma Photon** | `luma-photon`, `luma-photon-flash` | Fal-only |
 | **Bria** (commercial-safe) | `bria` | Fal-only |
 
-When you request a single-provider model with `providers=["fal", "replicate"]`, the gateway automatically drops the unsupported provider from the failover chain and logs the reason in the job's `attempts`. To add a model, edit [`pixelrelay/models.py`](pixelrelay/models.py) — one row per model. **Always verify the slug against the provider's live model page before merging.**
+When you request a single-provider model with `providers=["fal", "replicate"]`, the gateway automatically drops the unsupported provider from the failover chain and logs the reason in the job's `attempts`.
 
 ---
 
 ## Roadmap
 
-- **v0.2.1** — Replicate-compatible API (`POST /v1/predictions`) for drop-in migration from Replicate-only setups
+- **v0.2.2** — Image-edit API support (`input_image` field for Kontext / Nano Banana edit / Recraft)
+- **v0.2.3** — Replicate-compatible API (`POST /v1/predictions`) for drop-in migration from Replicate-only setups
 - **v0.3.0** — Dashboard UI, structured logs, Alembic migrations, more providers (RunPod, Together, Stability)
 - **v0.4.0** — Strategy modes (cheapest/fastest), per-provider cooldown config, health-check pre-flight
 - **v0.6.0** — Video generation (Runway, Kling, Pika)
 
+Full roadmap with rationale: [CONTEXT.md](CONTEXT.md#roadmap)
+
 ---
 
-## Contributing
+## Community & Contributing
 
-To add a new provider, implement `BaseProvider` in `pixelrelay/providers/` (both `generate` for library mode and `submit_async` + `parse_callback` for the gateway). Register it in `pixelrelay/gateway/server.py::_build_provider_registry`.
+- 🐛 **Report bugs / request models**: [GitHub Issues](https://github.com/SamurAIGPT/pixelrelay/issues)
+- 🛠 **Add a model**: One row in [`pixelrelay/models.py`](pixelrelay/models.py). **Always verify the slug against the provider's live model page before submitting** — silently wrong slugs cause failover thrash.
+- 🔌 **Add a provider**: Implement `BaseProvider` in [`pixelrelay/providers/`](pixelrelay/providers/) — both `generate` (library mode) and `submit_async` + `parse_callback` (gateway). Register it in `pixelrelay/gateway/server.py::_build_provider_registry`. See `fal.py` or `replicate.py` for examples.
+- 🧪 **Run tests**: `pytest tests/ -v`. PRs that touch providers or the registry should pass all 20 tests and add at least one for the change.
+- 🗺 **Roadmap**: [CONTEXT.md](CONTEXT.md#roadmap)
+
+PRs welcome.
 
 ## License
 
