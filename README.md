@@ -13,6 +13,11 @@
 
 ---
 
+## Related Projects
+
+- [Open-Generative-AI](https://github.com/Anil-matcha/Open-Generative-AI) — Free self-hosted AI media studio — consumer-facing UI that this gateway powers
+- [muapi-cli](https://github.com/SamurAIGPT/muapi-cli) — CLI for MuAPI — another interface to the same model infrastructure
+
 ## Quickstart (60 seconds)
 
 ```bash
