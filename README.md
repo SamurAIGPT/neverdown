@@ -15,6 +15,7 @@
 
 ## Related Projects
 
+- [MuAPI](https://muapi.ai) — Unified API for image, video, and audio generation across hundreds of AI models. See the [API reference](https://muapi.ai/docs/api-reference) and [model catalog](https://muapi.ai/docs/models).
 - [Open-Generative-AI](https://github.com/Anil-matcha/Open-Generative-AI) — Free self-hosted AI media studio — consumer-facing UI that this gateway powers
 - [muapi-cli](https://github.com/SamurAIGPT/muapi-cli) — CLI for MuAPI — another interface to the same model infrastructure
 
